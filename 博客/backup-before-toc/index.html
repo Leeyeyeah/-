@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeeYee</title>
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 导航栏 -->
+    <header>
+      <div class="header-inner">
+        <div class="logo">
+          <a href="#" @click.prevent="goHome">{{ blog.title }}</a>
+        </div>
+        <div class="header-right">
+          <nav>
+            <a href="#" @click.prevent="goHome" :class="{ active: currentPage === 'home' }">文章</a>
+            <a href="#" @click.prevent="currentPage = 'about'" :class="{ active: currentPage === 'about' }">关于</a>
+          </nav>
+          <button class="theme-toggle" @click="toggleTheme" :aria-label="theme === 'light' ? '切换到暗色模式' : '切换到亮色模式'">
+            <svg v-if="theme === 'light'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- 个人资料卡片：所有页面显示，宽屏固定在左侧空白处 -->
+      <section class="profile-card">
+        <div class="profile-cover">
+          <img
+            v-if="!avatarError"
+            :src="profile.avatar"
+            :alt="profile.name"
+            @error="avatarError = true"
+          >
+          <div v-else class="profile-avatar-fallback">{{ profile.name.charAt(0) }}</div>
+        </div>
+        <div class="profile-body">
+          <h3 class="profile-name">{{ profile.name }}<span class="profile-emoji">{{ profile.emoji }}</span></h3>
+          <span class="profile-divider"></span>
+          <p class="profile-bio">{{ profile.bio }}</p>
+          <div class="profile-links">
+            <a
+              v-for="link in profile.links"
+              :key="link.label"
+              :href="link.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="profile-link"
+              :title="link.label"
+              :aria-label="link.label"
+            >
+              <svg v-if="link.icon === 'github'" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.26 5.68.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/>
+              </svg>
+              <svg v-else-if="link.icon === 'mail'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                <path d="m3 7 9 6 9-6"/>
+              </svg>
+              <span v-else class="profile-link-text">{{ link.text || link.label }}</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 天气卡片：所有页面显示，宽屏固定在右侧空白处 -->
+      <section class="weather-card">
+        <div class="weather-header">
+          <h3 class="weather-title">天气</h3>
+          <div class="weather-header-right">
+            <span class="weather-updated" v-if="weather.updated && !weather.loading && !weather.error">{{ weather.updated }} 更新</span>
+            <button
+              class="weather-refresh"
+              :class="{ spinning: weather.loading }"
+              @click="refreshWeather"
+              :disabled="weather.loading"
+              title="刷新天气"
+              aria-label="刷新天气"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+                <polyline points="21 3 21 9 15 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div v-if="weather.loading" class="weather-state">
+          <span class="weather-spinner"></span>
+          <span>加载中...</span>
+        </div>
+        <div v-else-if="weather.error" class="weather-state">
+          <span>☁️ 天气加载失败</span>
+        </div>
+        <div v-else class="weather-body">
+          <div class="weather-row">
+            <span class="weather-city">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              {{ weather.city }}
+            </span>
+            <span class="weather-desc">{{ weather.desc }}</span>
+          </div>
+          <div class="weather-row weather-main">
+            <span class="weather-icon">{{ weather.icon }}</span>
+            <span class="weather-temp">{{ weather.temp }}<small>°C</small></span>
+            <div class="weather-meta">
+              <span>{{ weather.wind }}</span>
+              <span>湿度 {{ weather.humidity }}%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 首页：文章列表 -->
+      <div v-if="currentPage === 'home'">
+        <div class="page-header">
+          <h2>所有文章</h2>
+          <p class="page-subtitle" v-if="articles.length">共 {{ articles.length }} 篇</p>
+        </div>
+
+        <div v-if="loading" class="loading-state">
+          <p>加载中...</p>
+        </div>
+
+        <div v-else-if="articles.length === 0" class="empty-state">
+          <p>还没有文章，在 <code>articles/</code> 文件夹中添加 <code>.md</code> 文件即可发布。</p>
+        </div>
+
+        <section v-else class="article-list">
+          <article
+            v-for="article in pagedArticles"
+            :key="article.id"
+            @click="viewArticle(article.id)"
+            class="article-card"
+          >
+            <div class="article-card-body">
+              <div class="article-meta">
+                <time>{{ article.date }}</time>
+                <span class="category-tag" v-if="article.category">{{ article.category }}</span>
+              </div>
+              <h2>{{ article.title }}</h2>
+              <p class="article-summary">{{ article.summary }}</p>
+              <span class="read-more">阅读全文 →</span>
+            </div>
+          </article>
+        </section>
+
+        <nav class="pagination" v-if="totalPages > 1">
+          <button class="page-btn" @click="prevPage" :disabled="currentListPage === 1">← 上一页</button>
+          <span class="page-numbers">
+            <button
+              v-for="n in totalPages"
+              :key="n"
+              class="page-btn page-num"
+              :class="{ active: n === currentListPage }"
+              @click="goToPage(n)"
+            >{{ n }}</button>
+          </span>
+          <button class="page-btn" @click="nextPage" :disabled="currentListPage === totalPages">下一页 →</button>
+        </nav>
+      </div>
+
+      <!-- 文章详情页 -->
+      <div v-if="currentPage === 'article'" class="article-detail">
+        <div v-if="loadingArticle" class="loading-state">
+          <p>加载文章...</p>
+        </div>
+        <div v-else class="article-detail-card">
+          <div class="article-detail-header">
+            <h1>{{ currentArticle.title }}</h1>
+            <div class="article-detail-meta">
+              <time>{{ currentArticle.date }}</time>
+              <span v-if="currentArticle.category" class="category-tag">{{ currentArticle.category }}</span>
+            </div>
+          </div>
+          <div class="article-content" v-html="currentArticleContent"></div>
+          <div class="article-footer">
+            <a href="#" @click.prevent="goHome" class="back-link">← 返回文章列表</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 关于页面 -->
+      <div v-if="currentPage === 'about'" class="page-about">
+        <div class="page-header">
+          <h2>关于</h2>
+        </div>
+        <div class="article-detail-card">
+          <div class="about-content">
+            <p>欢迎来到我的博客！这里记录了我对技术、设计和生活的思考与分享。</p>
+            <h3>关于本站</h3>
+            <p>这是一个使用 Vue.js 构建的静态博客系统。文章采用 Markdown 编写，存放在 <code>articles/</code> 目录下，系统会自动扫描并加载所有文章。</p>
+            <h3>如何使用</h3>
+            <ol>
+              <li>在 <code>articles/</code> 文件夹中创建 <code>.md</code> 文件</li>
+              <li>文章第一行以 <code># 标题</code> 格式书写标题</li>
+              <li>在标题下方添加 <code>> 日期：YYYY-MM-DD</code> 和 <code>> 分类：分类名</code> 来指定元数据</li>
+              <li>刷新页面即可看到新文章</li>
+            </ol>
+            <h3>技术栈</h3>
+            <ul>
+              <li>Vue 3 — 前端框架</li>
+              <li>Markdown — 内容格式</li>
+              <li>marked — Markdown 解析</li>
+              <li>原生 CSS — 样式设计</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <p>&copy; {{ new Date().getFullYear() }} {{ blog.title }}</p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          currentPage: 'home',
+          currentArticleId: null,
+          currentArticleContent: '',
+          theme: 'light',
+          currentListPage: 1,
+          pageSize: 5,
+          loading: true,
+          loadingArticle: false,
+          avatarError: false,
+          blog: {
+            title: 'LeeYee'
+          },
+          // 个人资料卡片：改成你自己的信息即可
+          // avatar 加载失败时会自动显示名字首字母占位
+          profile: {
+            name: 'LeeYee',
+            emoji: '☀️',
+            bio: '真诚，热爱',
+            avatar: 'images/头像.png',
+            links: [
+              // icon 可选 'github' / 'mail'，其余用 text 显示文字（如 QQ）
+              { label: 'QQ', text: 'QQ', url: '#' },
+              { label: 'GitHub', icon: 'github', url: 'https://github.com/' },
+              { label: '邮箱', icon: 'mail', url: 'mailto:hi@example.com' }
+            ]
+          },
+          articles: [],
+          // 天气卡片状态
+          weather: {
+            loading: true,
+            error: false,
+            city: '',
+            desc: '',
+            icon: '⛅',
+            temp: '--',
+            wind: '',
+            humidity: '--',
+            updated: ''
+          },
+          // 天气卡片配置：浏览器定位和 IP 定位都失败时使用默认城市
+          weatherConfig: {
+            defaultCity: '北京',
+            defaultLat: 39.9042,
+            defaultLon: 116.4074,
+            weatherTTL: 60 * 60 * 1000,      // 天气缓存 1 小时
+            locationTTL: 4 * 60 * 60 * 1000  // 定位缓存 4 小时
+          }
+        };
+      },
+      computed: {
+        sortedArticles() {
+          return [...this.articles].sort((a, b) => {
+            return new Date(b.rawDate) - new Date(a.rawDate);
+          });
+        },
+        totalPages() {
+          return Math.ceil(this.sortedArticles.length / this.pageSize) || 1;
+        },
+        pagedArticles() {
+          const start = (this.currentListPage - 1) * this.pageSize;
+          return this.sortedArticles.slice(start, start + this.pageSize);
+        },
+        currentArticle() {
+          return this.articles.find(a => a.id === this.currentArticleId) || {};
+        }
+      },
+      mounted() {
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark' || saved === 'light') {
+          this.theme = saved;
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          this.theme = 'dark';
+        }
+        this.applyTheme();
+        this.scanArticles();
+        this.loadWeather();
+      },
+      methods: {
+        toggleTheme() {
+          this.theme = this.theme === 'light' ? 'dark' : 'light';
+          localStorage.setItem('theme', this.theme);
+          this.applyTheme();
+        },
+        applyTheme() {
+          document.documentElement.classList.toggle('dark', this.theme === 'dark');
+        },
+        goHome() {
+          this.currentPage = 'home';
+          this.currentArticleId = null;
+          this.currentArticleContent = '';
+          this.currentListPage = 1;
+          window.scrollTo(0, 0);
+        },
+        goToPage(n) {
+          this.currentListPage = n;
+          window.scrollTo(0, 0);
+        },
+        prevPage() {
+          if (this.currentListPage > 1) {
+            this.currentListPage--;
+            window.scrollTo(0, 0);
+          }
+        },
+        nextPage() {
+          if (this.currentListPage < this.totalPages) {
+            this.currentListPage++;
+            window.scrollTo(0, 0);
+          }
+        },
+        // ===== 天气卡片 =====
+        // 数据源：Open-Meteo（免费、无需 Key、支持跨域）
+        // 定位：浏览器定位（需授权）→ IP 定位（ipwho.is / ipapi.co）→ 默认城市
+        // 缓存：天气 1 小时 / 定位 4 小时，存 sessionStorage
+        // 手动刷新：清掉天气和定位缓存后重新加载
+        refreshWeather() {
+          try {
+            sessionStorage.removeItem('weather_cache');
+            sessionStorage.removeItem('weather_location');
+          } catch (e) {}
+          this.weather.loading = true;
+          this.weather.error = false;
+          this.loadWeather();
+        },
+        async loadWeather() {
+          const cached = this.getWeatherCache();
+          if (cached) {
+            this.applyWeather(cached);
+            return;
+          }
+          try {
+            const loc = await this.getLocation();
+            const url = 'https://api.open-meteo.com/v1/forecast'
+              + '?latitude=' + loc.lat
+              + '&longitude=' + loc.lon
+              + '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day'
+              + '&timezone=auto';
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('weather http ' + resp.status);
+            const data = await resp.json();
+            const cur = data.current;
+            if (!cur) throw new Error('weather empty');
+            const info = this.mapWeatherCode(cur.weather_code, cur.is_day !== 0);
+            const result = {
+              city: loc.city,
+              desc: info.text,
+              icon: info.icon,
+              temp: Math.round(cur.temperature_2m),
+              wind: this.windDirection(cur.wind_direction_10m) + ' ' + Math.round(cur.wind_speed_10m) + ' km/h',
+              humidity: cur.relative_humidity_2m,
+              updated: this.formatTime(Date.now())
+            };
+            try {
+              sessionStorage.setItem('weather_cache', JSON.stringify({ data: result, t: Date.now() }));
+            } catch (e) {}
+            this.applyWeather(result);
+          } catch (e) {
+            this.weather.loading = false;
+            this.weather.error = true;
+          }
+        },
+        getWeatherCache() {
+          try {
+            const raw = sessionStorage.getItem('weather_cache');
+            if (!raw) return null;
+            const d = JSON.parse(raw);
+            if (Date.now() - d.t > this.weatherConfig.weatherTTL) {
+              sessionStorage.removeItem('weather_cache');
+              return null;
+            }
+            return d.data;
+          } catch (e) {
+            return null;
+          }
+        },
+        async getLocation() {
+          try {
+            const raw = sessionStorage.getItem('weather_location');
+            if (raw) {
+              const d = JSON.parse(raw);
+              if (Date.now() - d.t < this.weatherConfig.locationTTL) return d;
+            }
+          } catch (e) {}
+
+          // 1) 浏览器定位：最准确，不受代理/VPN 影响（需用户授权一次）
+          try {
+            const coords = await this.browserLocate();
+            const loc = {
+              lat: coords.latitude,
+              lon: coords.longitude,
+              city: await this.reverseGeocode(coords.latitude, coords.longitude) || this.weatherConfig.defaultCity,
+              t: Date.now()
+            };
+            try {
+              sessionStorage.setItem('weather_location', JSON.stringify(loc));
+            } catch (e) {}
+            return loc;
+          } catch (e) {}
+
+          // 2) IP 定位：无需授权，但走代理/VPN 时定位到的是出口节点位置
+          const ipProviders = [
+            {
+              url: 'https://ipwho.is/',
+              parse: d => (d && d.success !== false && d.latitude)
+                ? { lat: d.latitude, lon: d.longitude, city: d.city || d.region }
+                : null
+            },
+            {
+              url: 'https://ipapi.co/json/',
+              parse: d => (d && d.latitude)
+                ? { lat: d.latitude, lon: d.longitude, city: d.city || d.region }
+                : null
+            }
+          ];
+          for (const p of ipProviders) {
+            try {
+              const resp = await fetch(p.url);
+              const loc = p.parse(await resp.json());
+              if (loc) {
+                if (!loc.city) loc.city = this.weatherConfig.defaultCity;
+                loc.t = Date.now();
+                try {
+                  sessionStorage.setItem('weather_location', JSON.stringify(loc));
+                } catch (e) {}
+                return loc;
+              }
+            } catch (e) {}
+          }
+
+          // 3) 默认城市兜底
+          return {
+            lat: this.weatherConfig.defaultLat,
+            lon: this.weatherConfig.defaultLon,
+            city: this.weatherConfig.defaultCity,
+            t: Date.now()
+          };
+        },
+        browserLocate() {
+          return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) return reject(new Error('no geolocation'));
+            navigator.geolocation.getCurrentPosition(
+              p => resolve(p.coords),
+              e => reject(e),
+              { timeout: 8000, maximumAge: 30 * 60 * 1000 }
+            );
+          });
+        },
+        // 坐标 → 城市名（BigDataCloud 免费逆地理编码，无需 Key）
+        async reverseGeocode(lat, lon) {
+          try {
+            const resp = await fetch(
+              'https://api.bigdatacloud.net/data/reverse-geocode-client'
+              + '?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=zh'
+            );
+            const d = await resp.json();
+            return d.city || d.locality || d.principalSubdivision || '';
+          } catch (e) {
+            return '';
+          }
+        },
+        applyWeather(result) {
+          Object.assign(this.weather, result, { loading: false, error: false });
+        },
+        // WMO 天气码 → 中文描述 + 图标（区分昼夜）
+        mapWeatherCode(code, isDay) {
+          const map = {
+            0: ['晴', isDay ? '☀️' : '🌙'],
+            1: ['大致晴朗', isDay ? '🌤️' : '🌙'],
+            2: ['多云', '⛅'],
+            3: ['阴', '☁️'],
+            45: ['雾', '🌫️'], 48: ['雾凇', '🌫️'],
+            51: ['毛毛雨', '🌦️'], 53: ['毛毛雨', '🌦️'], 55: ['毛毛雨', '🌧️'],
+            56: ['冻毛毛雨', '🌧️'], 57: ['冻毛毛雨', '🌧️'],
+            61: ['小雨', '🌦️'], 63: ['中雨', '🌧️'], 65: ['大雨', '🌧️'],
+            66: ['冻雨', '🌧️'], 67: ['冻雨', '🌧️'],
+            71: ['小雪', '🌨️'], 73: ['中雪', '🌨️'], 75: ['大雪', '❄️'],
+            77: ['雪粒', '🌨️'],
+            80: ['阵雨', '🌦️'], 81: ['阵雨', '🌧️'], 82: ['暴雨', '⛈️'],
+            85: ['阵雪', '🌨️'], 86: ['阵雪', '❄️'],
+            95: ['雷阵雨', '⛈️'], 96: ['雷阵雨伴冰雹', '⛈️'], 99: ['雷阵雨伴冰雹', '⛈️']
+          };
+          const hit = map[code];
+          return hit ? { text: hit[0], icon: hit[1] } : { text: '未知', icon: '⛅' };
+        },
+        windDirection(deg) {
+          const dirs = ['北风', '东北风', '东风', '东南风', '南风', '西南风', '西风', '西北风'];
+          return dirs[Math.round(deg / 45) % 8];
+        },
+        formatTime(ts) {
+          const d = new Date(ts);
+          const h = String(d.getHours()).padStart(2, '0');
+          const m = String(d.getMinutes()).padStart(2, '0');
+          return h + ':' + m;
+        },
+        async scanArticles() {
+          this.loading = true;
+          try {
+            // 获取 articles 目录下的所有 .md 文件
+            // 由于无法直接列出目录，我们尝试 fetch 一个清单文件
+            // 或者通过已知文件名列表来加载
+            // 这里使用一个更通用的方法：尝试加载已知文章 + 动态发现
+            
+            // 先尝试获取 articles/index.json 或 articles/list.json
+            let fileList = [];
+            try {
+              const listResp = await fetch('articles/index.json');
+              if (listResp.ok) {
+                fileList = await listResp.json();
+              }
+            } catch (e) {
+              // 没有清单文件，使用默认列表
+            }
+
+            // 如果没有清单文件，尝试通过已知模式发现文章
+            // 我们通过尝试加载 articles/ 目录下的文件来发现
+            // 由于浏览器无法列出目录，我们提供一个约定：
+            // 用户可以在 articles/ 下放一个 list.json 来声明文章列表
+            // 或者我们使用默认的已知文章
+            
+            // 默认尝试加载的文章列表（会被 list.json 覆盖）
+            const defaultFiles = [
+              '1-programming-start.md',
+              '2-web-tools.md',
+              '3-css-layout.md',
+              '4-async-javascript.md',
+              '5-performance.md'
+            ];
+
+            const filesToLoad = fileList.length > 0 ? fileList : defaultFiles;
+            
+            const promises = filesToLoad.map((file, index) => {
+              const filename = typeof file === 'string' ? file : file.file;
+              return fetch('articles/' + filename)
+                .then(res => {
+                  if (!res.ok) throw new Error('Not found');
+                  return res.text();
+                })
+                .then(text => this.parseMarkdown(text, filename, index))
+                .catch(() => null);
+            });
+
+            const results = await Promise.all(promises);
+            this.articles = results.filter(r => r !== null);
+          } catch (err) {
+            console.error('扫描文章失败:', err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        parseMarkdown(text, filename, index) {
+          const lines = text.split('\n');
+          let title = filename.replace('.md', '').replace(/^\d+-/, '');
+          let date = '';
+          let rawDate = '';
+          let category = '';
+          let summary = '';
+          let contentStart = 0;
+
+          // 解析标题（第一个 # 开头的行）
+          for (let i = 0; i < lines.length; i++) {
+            const match = lines[i].match(/^#\s+(.+)/);
+            if (match) {
+              title = match[1].trim();
+              contentStart = i + 1;
+              break;
+            }
+          }
+
+          // 解析元数据（> 日期： 和 > 分类：）
+          for (let i = contentStart; i < Math.min(contentStart + 5, lines.length); i++) {
+            const line = lines[i].trim();
+            const dateMatch = line.match(/^>\s*日期[：:]\s*(.+)/);
+            const catMatch = line.match(/^>\s*分类[：:]\s*(.+)/);
+            if (dateMatch) {
+              date = dateMatch[1].trim();
+              rawDate = date;
+            }
+            if (catMatch) {
+              category = catMatch[1].trim();
+            }
+          }
+
+          // 生成摘要（取正文前两段纯文本）
+          let textContent = '';
+          for (let i = contentStart; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line && !line.startsWith('>') && !line.startsWith('#') && !line.startsWith('!') && !line.startsWith('```')) {
+              textContent += line + ' ';
+            }
+            if (textContent.length > 150) break;
+          }
+          summary = textContent.trim().substring(0, 150) + (textContent.length > 150 ? '...' : '');
+
+          // 如果没有日期，使用文件修改时间或默认
+          if (!date) {
+            const today = new Date();
+            date = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            rawDate = date;
+          }
+
+          // 格式化日期显示
+          const displayDate = this.formatDate(rawDate);
+
+          return {
+            id: index + 1,
+            title,
+            date: displayDate,
+            rawDate,
+            category,
+            summary,
+            filename: 'articles/' + filename
+          };
+        },
+        formatDate(dateStr) {
+          // 支持 YYYY-MM-DD 或 YYYY 年 MM 月 DD 日
+          const match = dateStr.match(/(\d{4})[-\u5e74]?\s*(\d{1,2})?[-\u6708]?\s*(\d{1,2})?\u65e5?/);
+          if (match) {
+            const y = match[1];
+            const m = match[2] || '01';
+            const d = match[3] || '01';
+            return `${y} 年 ${m} 月 ${d} 日`;
+          }
+          return dateStr;
+        },
+        viewArticle(id) {
+          this.currentArticleId = id;
+          this.currentPage = 'article';
+          this.currentArticleContent = '';
+          this.loadingArticle = true;
+          window.scrollTo(0, 0);
+          this.loadMarkdown(id);
+        },
+        async loadMarkdown(id) {
+          const article = this.articles.find(a => a.id === id);
+          if (!article) {
+            this.loadingArticle = false;
+            return;
+          }
+
+          try {
+            const response = await fetch(article.filename);
+            const text = await response.text();
+            
+            // 渲染 Markdown，移除元数据行
+            const lines = text.split('\n');
+            const filteredLines = lines.filter(line => {
+              return !line.trim().match(/^>\s*(日期|分类)[：:]/) && !line.trim().match(/^#\s+/);
+            });
+            
+            // 拼接并剥离 ANSI 转义字符（如 \x1b[36m、\x1b[0m 等终端控制码）
+            let content = filteredLines.join('\n');
+            content = content.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+            
+            this.currentArticleContent = marked.parse(content);
+          } catch (error) {
+            console.error('加载文章失败:', error);
+            this.currentArticleContent = '<p class="error-message">文章加载失败，请稍后重试。</p>';
+          } finally {
+            this.loadingArticle = false;
+          }
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>net test</title></head>
+<body>
+<pre id="out">testing...</pre>
+<script>
+const out = document.getElementById('out');
+const lines = [];
+async function test(name, url) {
+  const t0 = Date.now();
+  try {
+    const resp = await fetch(url);
+    const text = await resp.text();
+    let info = '';
+    try {
+      const d = JSON.parse(text);
+      info = 'json ok, city=' + (d.city || '?') + ' success=' + d.success;
+    } catch (e) {
+      info = 'NOT json: ' + text.slice(0, 80).replace(/\n/g, ' ');
+    }
+    lines.push(name + ': HTTP ' + resp.status + ' (' + (Date.now() - t0) + 'ms) ' + info);
+  } catch (e) {
+    lines.push(name + ': FETCH FAILED (' + (Date.now() - t0) + 'ms) ' + e.message);
+  }
+  out.textContent = lines.join('\n');
+}
+(async () => {
+  await test('ipwho.is', 'https://ipwho.is/');
+  await test('ipapi.co', 'https://ipapi.co/json/');
+  await test('open-meteo', 'https://api.open-meteo.com/v1/forecast?latitude=23.1&longitude=114.4&current=temperature_2m&timezone=auto');
+  await test('bigdatacloud', 'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=23.1&longitude=114.4&localityLanguage=zh');
+  out.textContent = lines.join('\n') + '\nDONE';
+})();
+</script>
+</body>
+</html>

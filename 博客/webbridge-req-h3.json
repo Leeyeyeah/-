@@ -1,0 +1,1 @@
+{"action":"evaluate","args":{"code":"(() => { document.querySelectorAll('nav a')[1].click(); return 'about clicked'; })()"},"session":"blog-profile-card"}
